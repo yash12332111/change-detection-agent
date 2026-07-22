@@ -139,3 +139,88 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* Phase 6 additions */
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: #0f172a;
+  padding: 48px 24px;
+}
+
+.errorMsg {
+  font-size: 0.85rem;
+  color: #f87171;
+  margin-bottom: 12px;
+}
+
+.demoHint {
+  font-size: 0.8rem;
+  color: #475569;
+  margin-bottom: 28px;
+}
+
+.demoLink {
+  all: unset;
+  cursor: pointer;
+  color: #60a5fa;
+  text-decoration: underline;
+}
+
+/* History */
+.historySection {
+  margin-top: 8px;
+}
+
+.historyTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #475569;
+  margin-bottom: 10px;
+}
+
+.historyEmpty {
+  font-size: 0.85rem;
+  color: #334155;
+  padding: 12px 0;
+}
+
+.historyList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.historyItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: #111827;
+  border-radius: 6px;
+  border: 1px solid #1e293b;
+}
+
+.historyUrl {
+  all: unset;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #93c5fd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.historyUrl:hover {
+  text-decoration: underline;
+}
+
+.historyMeta {
+  font-size: 0.75rem;
+  color: #334155;
+}

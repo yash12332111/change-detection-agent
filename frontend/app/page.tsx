@@ -1,103 +1,163 @@
-/**
- * page.tsx — Phase 0 skeleton
- *
- * State machine: idle → running → complete | failed
- * Phase 0: URL input + Run button + health-check to verify backend is reachable.
- * Phases 6+ will wire in SSE, diff rendering, and agent trail.
- */
-
 "use client";
 
-import { useState } from "react";
+/**
+ * page.tsx — Homepage: URL input + run trigger + snapshot history
+ *
+ * Submitting the form:
+ *   POST /runs → {run_id, status: 'running'}
+ *   → router.push('/runs/<run_id>')
+ *
+ * On mount, fetches GET /snapshots for the history list.
+ */
+
+import { useState, useEffect, FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+
+interface SnapshotRow {
+  id: string;
+  url: string;
+  fetched_at: string;
+  content_hash: string | null;
+  status_code: number | null;
+  body_bytes: number | null;
+}
 
 export default function Home() {
-  const [url, setUrl] = useState("");
-  const [status, setStatus] = useState<"idle" | "checking">("idle");
-  const [healthMsg, setHealthMsg] = useState<string | null>(null);
-  const [healthOk, setHealthOk] = useState<boolean | null>(null);
+  const router = useRouter();
 
-  /** Smoke-test: verify the backend is reachable before Phase 6 wires the real run flow. */
-  async function checkHealth() {
-    setStatus("checking");
-    setHealthMsg(null);
-    setHealthOk(null);
+  const [url, setUrl]       = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError]   = useState<string | null>(null);
+  const [history, setHistory] = useState<SnapshotRow[]>([]);
+  const [histLoading, setHistLoading] = useState(true);
+
+  // Load snapshot history on mount
+  useEffect(() => {
+    fetch(`${BACKEND}/snapshots`)
+      .then(r => r.json())
+      .then(d => setHistory(d.snapshots ?? []))
+      .catch(() => setHistory([]))
+      .finally(() => setHistLoading(false));
+  }, []);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    const trimmed = url.trim();
+    if (!trimmed) return;
+
+    setLoading(true);
+    setError(null);
+
     try {
-      const res = await fetch(`${BACKEND_URL}/health`);
-      const data = await res.json();
-      if (res.ok && data.status === "ok") {
-        setHealthOk(true);
-        setHealthMsg(`✅ Backend reachable — ${data.ts}`);
-      } else {
-        setHealthOk(false);
-        setHealthMsg(`⚠️ Backend returned unexpected response: ${JSON.stringify(data)}`);
+      const res = await fetch(`${BACKEND}/runs`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ url: trimmed }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Backend error ${res.status}: ${text}`);
       }
-    } catch (err) {
-      setHealthOk(false);
-      setHealthMsg(`❌ Could not reach backend at ${BACKEND_URL}. Is it running?`);
-    } finally {
-      setStatus("idle");
+
+      const data = await res.json();
+      router.push(`/runs/${data.run_id}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
     }
   }
 
   return (
-    <main className={styles.main}>
+    <div className={styles.page}>
       <div className={styles.card}>
 
         {/* Header */}
         <div className={styles.header}>
-          <span className={styles.logo}>⚡ Change Detection Agent</span>
+          <h1 className={styles.logo}>⚡ Change Detection Agent</h1>
           <p className={styles.tagline}>
             Give it a URL → snapshot → compare → report what changed and why.
           </p>
         </div>
 
-        {/* URL Input */}
-        <div className={styles.inputGroup}>
+        {/* URL input form */}
+        <form className={styles.inputGroup} onSubmit={handleSubmit}>
           <input
             id="url-input"
             type="url"
             className={styles.input}
             placeholder="https://example.com"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            disabled={status === "checking"}
+            onChange={e => setUrl(e.target.value)}
+            disabled={loading}
+            required
           />
           <button
             id="run-btn"
+            type="submit"
             className={styles.btn}
-            disabled={status === "checking" || !url.trim()}
-            onClick={checkHealth}
-            title="Phase 6 will wire the real run — this verifies backend connectivity for now"
+            disabled={loading || !url.trim()}
           >
-            {status === "checking" ? "Checking…" : "Run"}
+            {loading ? "Starting…" : "Run"}
           </button>
-        </div>
+        </form>
 
-        {/* Status area */}
-        <div
-          className={`${styles.statusBox} ${
-            healthOk === true
-              ? styles.statusOk
-              : healthOk === false
-              ? styles.statusError
-              : styles.statusEmpty
-          }`}
-        >
-          {healthMsg ? (
-            <p className={styles.statusText}>{healthMsg}</p>
-          ) : (
-            <p className={styles.statusPlaceholder}>
-              Status and live feed will appear here when you run a check.
+        {error && (
+          <p className={styles.errorMsg}>⚠ {error}</p>
+        )}
+
+        {/* Quick-fill for demo target */}
+        <p className={styles.demoHint}>
+          Demo target:{" "}
+          <button
+            className={styles.demoLink}
+            onClick={() => setUrl("https://target-page-rho.vercel.app")}
+            type="button"
+          >
+            target-page-rho.vercel.app
+          </button>
+        </p>
+
+        {/* Snapshot history */}
+        <div className={styles.historySection}>
+          <h2 className={styles.historyTitle}>Recent Snapshots</h2>
+          {histLoading ? (
+            <p className={styles.historyEmpty}>Loading…</p>
+          ) : history.length === 0 ? (
+            <p className={styles.historyEmpty}>
+              No snapshots yet. Run your first check above.
             </p>
+          ) : (
+            <ul className={styles.historyList}>
+              {history.map(row => (
+                <li key={row.id} className={styles.historyItem}>
+                  <button
+                    className={styles.historyUrl}
+                    onClick={() => setUrl(row.url)}
+                    type="button"
+                    title="Click to pre-fill URL"
+                  >
+                    {row.url}
+                  </button>
+                  <span className={styles.historyMeta}>
+                    {new Date(row.fetched_at).toLocaleString()}
+                    {row.body_bytes != null && (
+                      <> · {(row.body_bytes / 1024).toFixed(1)} KB</>
+                    )}
+                    {row.status_code != null && (
+                      <> · HTTP {row.status_code}</>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
 
-        {/* Phase badge */}
-        <div className={styles.phaseBadge}>Phase 0 — Skeleton</div>
       </div>
-    </main>
+    </div>
   );
 }

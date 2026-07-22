@@ -7,6 +7,11 @@ Four hand-labelled fixtures covering:
   3. Structural wrapper only  (extra <div>, no text)    : functional, low
   4. High-stakes numeric edit (compliance SLA %)        : content,    high
 
+LIMITATION: This is a 4-case starting golden set used to catch gross miscalibration
+only; the prompt was calibrated directly against these examples, so passing them
+does not prove generalisation — a production eval would require a separate held-out
+slice that was never seen during prompt tuning.
+
 CANNED-BY-DEFAULT DESIGN (matches architecture spec):
   Running `python scripts/golden_set.py` uses pre-stored canned LLM responses
   by default — no Groq API quota consumed, fast, deterministic.

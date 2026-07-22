@@ -87,6 +87,15 @@ A manual [health check workflow](.github/workflows/health-check.yml) is also ava
 
 The target page is deployed at `https://target-page-rho.vercel.app`.
 
+1. **Step 0 — Warm the backend (run 2 min before recording):**
+   ```bash
+   for i in {1..3}; do
+     result=$(curl -sf --max-time 60 https://change-detection-agent.onrender.com/health)
+     if [ $? -eq 0 ]; then echo "✓ Backend awake: $result"; break; fi
+     echo "Attempt $i cold, retrying…"; sleep 10
+   done
+   ```
+   *Do NOT start recording until you see `✓ Backend awake`. If it fails all 3 attempts, wait 30s and re-run — Render cold-start is 25–35s and the loop covers it.*
 1. **Establish Baseline:** Trigger a run on `https://target-page-rho.vercel.app` — creates the first snapshot.
 2. **Edit Target Page:** Modify `target-page/index.html` locally (e.g., change the $99 price to $149, or change the 72h compliance SLA).
 3. **Deploy Change:** `cd target-page && npx vercel --prod --yes`

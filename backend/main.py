@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, field_validator
 
 import events as _events
 import storage as _storage
@@ -36,7 +36,7 @@ load_dotenv()
 app = FastAPI(
     title="Change Detection Agent",
     description="Visits a URL, snapshots it, compares against last visit, reports what changed and why.",
-    version="0.6.0",
+    version="0.7.0",
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
@@ -68,6 +68,17 @@ async def _capture_loop() -> None:
 
 class RunRequest(BaseModel):
     url: str  # raw URL; pipeline canonicalizes it internally
+
+    @field_validator("url")
+    @classmethod
+    def url_not_empty(cls, v: str) -> str:
+        """
+        Reject blank / whitespace-only URLs before the pipeline starts.
+        Returns 422 immediately — no run row is created, no orphaned DB record.
+        """
+        if not v or not v.strip():
+            raise ValueError("URL cannot be empty. Please enter a valid URL.")
+        return v.strip()
 
 
 class RunResponse(BaseModel):

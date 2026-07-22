@@ -1,36 +1,38 @@
 """
-events.py — Phase 5: Single-call event emission
+events.py — Phase 5/6: Single-call event emission
 
 Architecture rule: one emit() call, two outputs.
   1. Persistent  — insert into the Supabase events table (permanent audit trail).
-  2. Live feed   — push to an in-memory asyncio.Queue per run_id (Phase 6 SSE source).
+  2. Live feed   — push to an in-memory asyncio.Queue per run_id (SSE source).
 
 Both happen in every emit() call. There is no separate logging system and no
 separate feed system — one call satisfies both architectural requirements.
 
-Design notes and deferred concerns:
+Phase 6 threading model:
+  The pipeline runs in a FastAPI BackgroundTask thread (off the event loop).
+  emit() is called from that thread. The in-memory queue belongs to the event loop.
+  To push safely from a thread into an event loop queue, we use
+  loop.call_soon_threadsafe(queue.put_nowait, event) instead of queue.put_nowait(event)
+  directly. This prevents data races on the queue between the pipeline thread and
+  the SSE coroutine that drains it.
+
+Design notes:
   - why is required and validated non-empty at call time (ValueError if blank).
     The architecture demands "every action and why"; this contract is enforced
     here so callers can't quietly omit it.
-  - Queues fill with no consumer in Phase 5. This is intentional — a script
-    run produces a finite number of events and exits. Queue lifecycle (creation,
-    draining, and cleanup) is a Phase 6 concern when the SSE endpoint is wired
-    up and actually drains them. Do not add cleanup here.
-  - insert_event is a synchronous DB write called inside an async function.
-    For the CLI script this is acceptable. However, each emit() blocks on a
-    network round-trip, which means the live feed could lag behind real pipeline
-    progress under load. Revisit in Phase 6: consider async DB writes or a
-    background-flush queue to decouple DB latency from event emission latency.
+  - Queue lifecycle: queues are created lazily in subscribe(), cleaned up by
+    unsubscribe() once the SSE stream closes. The pipeline thread writes events;
+    the SSE coroutine reads them. Cleanup is safe because the SSE generator
+    is the only reader and calls unsubscribe() in a finally block.
   - A failed insert_event logs a warning and continues. The work matters more
     than the log of the work — a persistence failure must never crash the run.
 """
 
 import asyncio
 import datetime
+import threading
 from typing import Optional
 
-# storage imported lazily inside emit() to allow the module to be imported
-# even before backend/.env is loaded (e.g. in unit tests that mock insert_event).
 import storage as _storage
 
 
@@ -40,18 +42,46 @@ VALID_STEPS = frozenset({"PLAN", "ACQUIRE", "EXTRACT", "COMPARE", "REASON", "REP
 
 
 # ── In-memory queue registry ───────────────────────────────────────────────────
-# One asyncio.Queue per run_id, created lazily on the first emit() call for
-# that run. These queues fill with no consumer in Phase 5; that is intentional.
-# Queue lifecycle and cleanup is a Phase 6 concern when the SSE endpoint drains.
+# One asyncio.Queue per run_id, keyed by run_id string.
+# Queues are created by subscribe() and removed by unsubscribe().
+# Protected by a threading.Lock so the pipeline thread (BackgroundTask) and
+# the event loop coroutine (SSE) can both safely access the registry.
 
 _queues: dict[str, asyncio.Queue] = {}
+_queues_lock = threading.Lock()
+
+# Reference to the running event loop, captured at server startup.
+# Required so the pipeline thread can schedule puts via call_soon_threadsafe.
+_loop: Optional[asyncio.AbstractEventLoop] = None
 
 
-def get_event_queue(run_id: str) -> asyncio.Queue:
-    """Return (lazily creating) the in-memory event queue for a given run_id."""
-    if run_id not in _queues:
-        _queues[run_id] = asyncio.Queue()
-    return _queues[run_id]
+def set_event_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """Called once at FastAPI startup to capture the running event loop."""
+    global _loop
+    _loop = loop
+
+
+def subscribe(run_id: str) -> asyncio.Queue:
+    """
+    Create and register the queue for this run_id.
+    MUST be called before the pipeline starts (i.e., before BackgroundTask fires)
+    so that events emitted immediately at pipeline start are buffered, not lost.
+    Returns the queue for the SSE coroutine to drain.
+    """
+    q: asyncio.Queue = asyncio.Queue()
+    with _queues_lock:
+        _queues[run_id] = q
+    return q
+
+
+def unsubscribe(run_id: str) -> None:
+    """
+    Remove and discard the queue for this run_id.
+    Called by the SSE generator's finally block after the stream closes.
+    Safe to call even if the run_id is not registered.
+    """
+    with _queues_lock:
+        _queues.pop(run_id, None)
 
 
 # ── Emit ────────────────────────────────────────────────────────────────────────
@@ -69,21 +99,21 @@ async def emit(
     Output 1 (persistent): inserts a row into the Supabase events table so
     every run leaves a complete, queryable audit trail.
 
-    Output 2 (live feed): pushes the event dict onto the asyncio.Queue for
-    this run_id, ready for Phase 6's SSE endpoint to consume.
+    Output 2 (live feed): pushes the event onto the asyncio.Queue for this
+    run_id so the SSE endpoint delivers it to the browser in real time.
+
+    Thread safety: emit() may be called from a BackgroundTask thread. The
+    queue push uses loop.call_soon_threadsafe() to cross the thread boundary
+    safely. The DB insert is a blocking call — safe in a thread, never blocks
+    the event loop.
 
     Args:
         run_id:  UUID string identifying this pipeline run.
         step:    Pipeline step. Must be one of:
                  PLAN | ACQUIRE | EXTRACT | COMPARE | REASON | REPORT
-        message: Human narration of what happened. Write for a person reading
-                 a story, not a developer reading a debug log.
-                 Good:  "Static fetch returned a 2 KB shell — refusing."
-                 Bad:   "js_shell=True body_size=2048"
-        why:     Why this action was taken. Required, non-empty — the
-                 architecture mandates every event carries a 'why'.
-        detail:  Optional structured payload (section counts, hash prefix,
-                 verdict, etc.) stored in the jsonb detail column.
+        message: Human narration of what happened (not a debug log).
+        why:     Why this action was taken. Required, non-empty.
+        detail:  Optional structured payload stored in the jsonb detail column.
 
     Raises:
         ValueError: if why is empty/whitespace, or step is not a valid step name.
@@ -118,9 +148,9 @@ async def emit(
     print(f"           why: {why}")
 
     # ── Output 1: Persistent — Supabase events table ──────────────────────────
-    # NOTE: insert_event is a synchronous DB write inside an async function.
-    # Per-event DB latency could cause the live feed to lag pipeline progress.
-    # Revisit in Phase 6 with async writes or a background-flush queue.
+    # This is a blocking call. In Phase 6 the pipeline runs in a BackgroundTask
+    # thread (not the event loop), so blocking here is safe — it no longer
+    # stalls SSE delivery.
     try:
         _storage.insert_event(
             run_id=run_id,
@@ -135,6 +165,14 @@ async def emit(
         print(f"           ⚠ Event persistence failed (non-fatal): {exc}")
 
     # ── Output 2: Live feed — in-memory asyncio.Queue ─────────────────────────
-    # Queues fill with no consumer in Phase 5; intentional.
-    # Queue lifecycle and cleanup is a Phase 6 concern when SSE drains them.
-    get_event_queue(run_id).put_nowait(event)
+    # Use call_soon_threadsafe so the pipeline thread can push safely into
+    # the event loop's queue without data races.
+    with _queues_lock:
+        q = _queues.get(run_id)
+
+    if q is not None and _loop is not None:
+        _loop.call_soon_threadsafe(q.put_nowait, event)
+    elif q is not None:
+        # Fallback: if called from within the event loop (e.g. CLI script),
+        # put_nowait directly — no thread crossing needed.
+        q.put_nowait(event)

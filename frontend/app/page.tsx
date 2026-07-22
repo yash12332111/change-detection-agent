@@ -59,8 +59,25 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Backend error ${res.status}: ${text}`);
+        let msg: string;
+        if (res.status === 422) {
+          // Pydantic validation error — extract the first human-readable message
+          try {
+            const body = await res.json();
+            const detail = body?.detail;
+            if (Array.isArray(detail) && detail.length > 0) {
+              msg = detail[0].msg ?? "Invalid request.";
+            } else {
+              msg = typeof detail === "string" ? detail : "Invalid request.";
+            }
+          } catch {
+            msg = "Invalid request.";
+          }
+        } else {
+          const text = await res.text();
+          msg = `Backend error ${res.status}: ${text}`;
+        }
+        throw new Error(msg);
       }
 
       const data = await res.json();

@@ -1,0 +1,19 @@
+name: Health Check (manual)
+
+# NOT the primary keep-warm mechanism.
+# Warmth is handled by UptimeRobot / cron-job.org hitting /health every 5–10 min.
+# This workflow exists for manual verification only (e.g. before a demo).
+on:
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          echo "Pinging ${{ vars.BACKEND_URL }}/health …"
+          curl -sf --retry 2 --retry-delay 5 \
+            "${{ vars.BACKEND_URL }}/health"
+          echo ""
+          echo "Backend is alive."

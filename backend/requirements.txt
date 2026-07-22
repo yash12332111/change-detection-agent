@@ -1,5 +1,6 @@
 annotated-doc==0.0.4
 annotated-types==0.7.0
+beautifulsoup4==4.15.0
 anyio==4.12.1
 certifi==2026.6.17
 cffi==2.0.0
@@ -16,6 +17,7 @@ httptools==0.8.0
 httpx==0.28.1
 hyperframe==6.1.0
 idna==3.18
+lxml==6.1.1
 multidict==6.7.1
 packaging==26.2
 postgrest==2.31.0

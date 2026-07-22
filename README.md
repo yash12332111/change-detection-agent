@@ -135,13 +135,15 @@ What was explicitly verified (not claimed, tested):
 | 2 | Whitespace only | 422 before run row created |
 | 3 | `not a url!!!` | `verdict=failed`, "Could not resolve hostname" |
 | 4 | `https://this-host-does-not-exist-xyz.example` | `verdict=failed`, DNS failure message |
-| 5 | `https://httpbin.org/json` | `verdict=failed`, "Expected HTML but got application/json" |
+| 5 | `https://httpbin.org/json` | `verdict=failed`, JS-shell gate (httpbin returned 503 HTML, 162 B) — content-type guard *implemented*, not live-tested by this case |
 | 6 | `http://127.0.0.1` | `verdict=failed`, "internal/private addresses not allowed" |
 | 7 | `http://169.254.169.254` | `verdict=failed`, "internal/private addresses not allowed" |
 | 8 | `https://app.diagrams.net` | `verdict=failed`, "This page renders client-side" |
 | 9 | Valid HTML page | Normal `first_run` / `no_change` / `content` run |
 
 None of cases 1–8 produce a stack trace in the UI.
+
+**Content-type guard note:** `fetch_page()` checks `"html" in content-type` before returning and raises `FetchError("Expected HTML but got Content-Type '…'")` for non-HTML responses. The guard is in [`fetcher.py`](backend/fetcher.py) and is covered by the code path — it was not independently verified in the smoke run above because httpbin.org was returning a 503 HTML error page at the time of testing.
 
 ---
 

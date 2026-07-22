@@ -4,13 +4,18 @@
 -- =====================================================================
 
 -- 1. snapshots: the page's memory (append-only — never UPDATE or DELETE)
-CREATE TABLE snapshots (
+CREATE TABLE IF NOT EXISTS snapshots (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     url           TEXT NOT NULL,                    -- canonical URL (key for lookups)
     fetched_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    content_hash  TEXT NOT NULL,                    -- SHA-256 of all text_hashes concatenated
-    sections_json JSONB NOT NULL,                   -- array of Section objects
-    raw_html      TEXT                              -- capped at ~500 KB per row
+    content_hash  TEXT,                             -- populated in Phase 2 (nullable until then)
+    sections_json JSONB,                            -- populated in Phase 2 (nullable until then)
+    raw_html      TEXT,                             -- capped at ~500 KB per row
+    status_code   INT,                              -- HTTP status code from fetch
+    content_type  TEXT,                             -- Content-Type header
+    body_bytes    INT,                              -- original byte length before cap
+    domain_changed BOOLEAN DEFAULT FALSE,           -- True if redirected to a different domain
+    redirect_trail JSONB                            -- list of redirect hops with why
 );
 
 -- Fast lookup: "give me the latest snapshot for this URL"

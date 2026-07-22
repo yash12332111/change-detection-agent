@@ -153,11 +153,16 @@ async def stream_events(run_id: str):
 
         # ── Step 2: replay stored history ─────────────────────────────────────
         stored = _storage.get_events(run_id)
-        seen_ids = set()
+        # Deduplicate fingerprint: (step, first 80 chars of message).
+        # ts cannot be used: Python datetime.now() runs before Supabase server-side now(),
+        # so the second digit can differ between the queue event and the stored event.
+        # Pipeline messages are unique per step within a run, so this is a reliable key.
+        seen: set = set()
         final_found = False
 
         for evt in stored:
-            seen_ids.add(evt.get("id"))
+            fp = f"{evt['step']}|{evt['message'][:80]}"
+            seen.add(fp)
             payload = json.dumps({
                 "step":    evt["step"],
                 "message": evt["message"],
@@ -190,11 +195,11 @@ async def stream_events(run_id: str):
                     yield ": keepalive\n\n"
                     continue
 
-                # Deduplicate in case an event was both in stored history and
-                # the live queue (emitted during the DB-read window).
-                evt_id = evt.get("id")
-                if evt_id and evt_id in seen_ids:
+                # Deduplicate: (step, message prefix) — same key as replay above.
+                fp = f"{evt['step']}|{evt['message'][:80]}"
+                if fp in seen:
                     continue
+                seen.add(fp)
 
                 payload = json.dumps({
                     "step":    evt["step"],

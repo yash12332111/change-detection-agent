@@ -246,7 +246,37 @@ async def run_pipeline(run_id: str, url: str) -> None:
                 report = {"verdict": "unavailable", "significance": "low",
                           "summary": str(exc), "sections": []}
 
+            # ── Merge word_diff from differ into report sections ───────────────
+            # reason() classifies sections but doesn't carry word_diff — it only
+            # sees section_id, classification, significance, interpretation.
+            # We build a lookup from differ's output and attach spans here so
+            # report_json contains everything the UI needs in one column.
+            # Differ uses op=equal/replace; convert to type=equal/insert/delete.
+            diff_by_id = {m["section_id"]: m for m in diff_result.get("modified", [])}
+            for sec in report.get("sections", []):
+                sid = sec.get("section_id")
+                diff_sec = diff_by_id.get(sid)
+                if not diff_sec:
+                    continue
+                raw_spans = diff_sec.get("word_diff", [])
+                converted = []
+                for span in raw_spans:
+                    op = span.get("op", "equal")
+                    if op == "equal":
+                        converted.append({"type": "equal",  "text": span.get("old", "")})
+                    elif op == "replace":
+                        converted.append({"type": "delete", "text": span.get("old", "")})
+                        converted.append({"type": "insert", "text": span.get("new", "")})
+                    elif op == "insert":
+                        converted.append({"type": "insert", "text": span.get("new", "")})
+                    elif op == "delete":
+                        converted.append({"type": "delete", "text": span.get("old", "")})
+                sec["word_diff"] = converted
+                sec["old_text"] = diff_sec.get("old_text", "")
+                sec["new_text"] = diff_sec.get("new_text", "")
+
             if report.get("verdict") in ("unclassified", "unavailable"):
+
                 await emit(
                     run_id, "REASON",
                     f"Classification failed — {report.get('summary', 'unknown error')}.",

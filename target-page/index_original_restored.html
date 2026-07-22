@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NovaPulse — AI-Powered Workflow Automation</title>
+  <meta name="description" content="NovaPulse automates your repetitive workflows with AI, saving your team hours every week." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #f9fafb;
+      color: #111827;
+      line-height: 1.6;
+    }
+
+    header {
+      background: #0f172a;
+      color: #fff;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header .logo { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.5px; color: #60a5fa; }
+
+    nav a {
+      color: #cbd5e1;
+      text-decoration: none;
+      margin-left: 24px;
+      font-size: 0.9rem;
+    }
+    nav a:hover { color: #fff; }
+
+    main { max-width: 960px; margin: 0 auto; padding: 48px 24px 80px; }
+
+    section { margin-bottom: 64px; }
+
+    h1 { font-size: 2.8rem; font-weight: 800; color: #0f172a; line-height: 1.2; }
+    h2 { font-size: 1.6rem; font-weight: 700; color: #1e293b; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+    p  { color: #374151; margin-bottom: 12px; }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    .hero-grid img {
+      width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+
+    .badge {
+      display: inline-block;
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Pricing */
+    .pricing-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 28px 24px;
+      text-align: center;
+      transition: box-shadow 0.2s;
+    }
+    .card:hover { box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+
+    .card.featured {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px #3b82f6;
+    }
+
+    .card .plan-name { font-size: 1rem; font-weight: 600; color: #6b7280; margin-bottom: 8px; }
+    .card .price     { font-size: 2.2rem; font-weight: 800; color: #0f172a; }
+    .card .price span { font-size: 1rem; font-weight: 400; color: #9ca3af; }
+    .card .desc      { font-size: 0.85rem; color: #6b7280; margin: 12px 0 20px; }
+
+    .btn {
+      display: inline-block;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-outline { background: #fff; color: #3b82f6; border: 1.5px solid #3b82f6; }
+
+    /* Features */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-top: 24px;
+    }
+
+    .feature-item {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .feature-item .icon { font-size: 1.5rem; margin-bottom: 8px; }
+    .feature-item h3    { font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+    .feature-item p     { font-size: 0.875rem; color: #6b7280; margin: 0; }
+
+    /* Compliance */
+    .compliance-box {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-left: 4px solid #f59e0b;
+      border-radius: 8px;
+      padding: 24px 28px;
+    }
+    .compliance-box p { color: #78350f; margin-bottom: 8px; }
+    .compliance-box p:last-child { margin-bottom: 0; }
+    .compliance-box strong { color: #92400e; }
+
+    /* Footer */
+    footer {
+      background: #0f172a;
+      color: #94a3b8;
+      text-align: center;
+      padding: 32px 24px;
+      font-size: 0.875rem;
+    }
+    footer a { color: #60a5fa; text-decoration: none; }
+    footer .footer-links { margin-bottom: 12px; }
+    footer .footer-links a { margin: 0 12px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <span class="logo">⚡ NovaPulse</span>
+    <nav>
+      <a href="#product">Product</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#features">Features</a>
+      <a href="#compliance">Compliance</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SECTION 1: Product Hero                                     -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section id="product">
+      <h2>Product Overview</h2>
+      <div class="hero-grid">
+        <div>
+          <span class="badge">Now in General Availability</span>
+          <h1>Automate the work<br/>your team hates</h1>
+          <p>
+            NovaPulse is an AI-powered workflow automation platform that connects your tools,
+            learns your processes, and eliminates repetitive manual tasks — without writing
+            a single line of code.
+          </p>
+          <p>
+            Trusted by <strong>1,200+ teams</strong> across finance, logistics, and healthcare.
+            Average time saved: <strong>11 hours per team per week.</strong>
+          </p>
+          <a href="#pricing" class="btn btn-primary">Get Started Free</a>
+        </div>
+        <div>
+          <img
+            src="https://images.unsplash.com/photo-1551434678-e076c223a692?w=600&q=80"
+            alt="NovaPulse dashboard showing workflow automation with connected tools and analytics"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SECTION 2: Pricing                                          -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section id="pricing">
+      <h2>Pricing</h2>
+      <p>Simple, transparent pricing. No hidden fees. Cancel any time.</p>
+
+      <div class="pricing-cards">
+
+        <div class="card">
+          <div class="plan-name">Starter</div>
+          <div class="price">$0 <span>/ month</span></div>
+          <div class="desc">For individuals exploring automation. Up to 3 workflows, 500 runs/month.</div>
+          <a href="#" class="btn btn-outline">Sign Up Free</a>
+        </div>
+
+        <div class="card featured">
+          <div class="plan-name">Pro</div>
+          <div class="price">$99 <span>/ month</span></div>
+          <div class="desc">For growing teams. Unlimited workflows, 50,000 runs/month, priority support.</div>
+          <a href="#" class="btn btn-primary">Start Pro Trial</a>
+        </div>
+
+        <div class="card">
+          <div class="plan-name">Enterprise</div>
+          <div class="price">$499 <span>/ month</span></div>
+          <div class="desc">For large orgs. SSO, audit logs, SLA, dedicated account manager.</div>
+          <a href="#" class="btn btn-outline">Contact Sales</a>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SECTION 3: Features                                         -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section id="features">
+      <h2>Features</h2>
+      <p>Everything your team needs to automate without friction.</p>
+
+      <div class="features-grid">
+        <div class="feature-item">
+          <div class="icon">🔗</div>
+          <h3>200+ Native Integrations</h3>
+          <p>Connect Slack, Salesforce, HubSpot, Jira, Google Workspace, and more — out of the box.</p>
+        </div>
+        <div class="feature-item">
+          <div class="icon">🧠</div>
+          <h3>AI Action Suggestions</h3>
+          <p>NovaPulse analyzes your workflows and suggests optimizations you hadn't thought of.</p>
+        </div>
+        <div class="feature-item">
+          <div class="icon">🔒</div>
+          <h3>Role-Based Access Control</h3>
+          <p>Granular permissions per workflow, team, and action. SOC 2 Type II certified.</p>
+        </div>
+        <div class="feature-item">
+          <div class="icon">📊</div>
+          <h3>Real-Time Analytics</h3>
+          <p>See exactly how many hours each workflow is saving, with per-action cost attribution.</p>
+        </div>
+        <div class="feature-item">
+          <div class="icon">⚡</div>
+          <h3>Sub-Second Triggers</h3>
+          <p>Webhooks, polling, and schedule-based triggers — all with &lt;500ms median latency.</p>
+        </div>
+        <div class="feature-item">
+          <div class="icon">🌍</div>
+          <h3>Multi-Region Deployment</h3>
+          <p>Your data stays in your region. US, EU, and APAC regions available on Pro and above.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- SECTION 4: Compliance                                       -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <section id="compliance">
+      <h2>Compliance &amp; Safety Information</h2>
+      <div class="compliance-box">
+        <p>
+          <strong>Data Residency:</strong> Customer data is processed and stored exclusively within
+          the selected geographic region. NovaPulse does not transfer personal data across region
+          boundaries without explicit customer consent.
+        </p>
+        <p>
+          <strong>Certifications:</strong> NovaPulse holds SOC 2 Type II and ISO 27001 certifications,
+          reviewed annually by an independent third-party auditor. Audit reports are available to
+          Enterprise customers upon request under NDA.
+        </p>
+        <p>
+          <strong>GDPR &amp; CCPA:</strong> NovaPulse acts as a data processor under GDPR. A Data
+          Processing Agreement (DPA) is available for all paid plans. California residents may
+          exercise rights under CCPA by contacting privacy@novapulse.io.
+        </p>
+        <p>
+          <strong>Incident Response:</strong> In the event of a data breach, affected customers will
+          be notified within 72 hours in accordance with GDPR Article 33 obligations.
+        </p>
+        <p>
+          <strong>Last reviewed:</strong> January 2025. Next review scheduled: July 2025.
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- SECTION 5: Footer                                           -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <footer id="footer">
+    <div class="footer-links">
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+      <a href="#">Security</a>
+      <a href="#">Status</a>
+      <a href="#">Contact</a>
+    </div>
+    <p>© 2025 NovaPulse Technologies, Inc. All rights reserved.</p>
+    <p style="margin-top:8px; color: #475569;">
+      NovaPulse, Inc. · 340 Pine Street, Suite 800 · San Francisco, CA 94104
+    </p>
+  </footer>
+
+</body>
+</html>

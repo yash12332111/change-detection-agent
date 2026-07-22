@@ -48,6 +48,15 @@ npm install && npm run dev
 
 Open http://localhost:3000
 
+## Demo Instructions (Live Change Trigger)
+
+To demonstrate the agent detecting a live change over HTTP:
+1. First run: `python scripts/run_pipeline.py https://target-page-rho.vercel.app` (establishes baseline).
+2. Edit the target page: modify `target-page/index.html` locally (e.g. change the $99 price).
+3. Push to deploy: `cd target-page && npx vercel --prod --yes`
+4. Second run: `python scripts/run_pipeline.py https://target-page-rho.vercel.app`
+The agent will fetch the newly deployed page, diff it, and LLM classify the change.
+
 ## Design Decisions
 
 | Choice | Why |

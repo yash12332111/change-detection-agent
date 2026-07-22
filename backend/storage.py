@@ -1,9 +1,10 @@
 """
-storage.py — Phase 1: Supabase persistence layer
+storage.py — Supabase persistence layer
 
 Provides:
-    save_snapshot(canonical_url, body, meta)  → snapshot_id (str)
-    get_latest_snapshot(canonical_url)        → dict | None
+    save_snapshot(canonical_url, body, meta)         → snapshot_id (str)
+    get_latest_snapshot(canonical_url)               → dict | None
+    insert_event(run_id, step, message, why, detail) → event_id (str)
 
 Design rules:
   - Append-only: snapshots are never overwritten or deleted here.
@@ -117,3 +118,39 @@ def get_latest_snapshot(canonical_url: str) -> Optional[dict]:
         return None
 
     return response.data[0]
+
+
+def insert_event(
+    run_id: str,
+    step: str,
+    message: str,
+    why: str,
+    detail: Optional[dict] = None,
+) -> str:
+    """
+    Insert a single event row into the events table.
+
+    Called by events.emit() on every pipeline event. Returns the new row's UUID.
+
+    Note: This is a synchronous DB write. When called from async emit(), it blocks
+    the event loop for the duration of the round-trip. Acceptable for the Phase 5
+    CLI script; revisit in Phase 6 if SSE latency becomes a concern.
+    """
+    db = _get_client()
+
+    row = {
+        "run_id":  run_id,
+        "step":    step,
+        "message": message,
+        "why":     why,
+        "detail":  detail or {},
+    }
+
+    response = db.table("events").insert(row).execute()
+
+    if not response.data:
+        raise RuntimeError(
+            f"Supabase events insert returned no data. Response: {response}"
+        )
+
+    return response.data[0]["id"]

@@ -33,15 +33,29 @@ CREATE TABLE runs (
 -- 3. events: every agent action + WHY
 --    This single table powers BOTH the live SSE feed AND the persistent agent trail.
 --    "why" is a column, not an afterthought.
-CREATE TABLE events (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    run_id      UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-    ts          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    step        TEXT NOT NULL,    -- PLAN | ACQUIRE | EXTRACT | COMPARE | REASON | REPORT
-    message     TEXT NOT NULL,    -- human narration (not a debug log)
-    why         TEXT NOT NULL,    -- why this action is being taken
-    detail_json JSONB             -- structured data (hashes, diffs, etc.)
+--
+--    Phase 5 note: run_id is a free-form UUID string here, NOT a FK to the runs
+--    table. The runs table FK and status tracking are Phase 6 concerns — when the
+--    POST /runs endpoint creates a runs row before the pipeline fires.
+--    Phase 5 scripts generate their own run_id locally and write events directly.
+CREATE TABLE IF NOT EXISTS events (
+    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id     UUID        NOT NULL,                    -- pipeline run identifier (no FK until Phase 6)
+    ts         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    step       TEXT        NOT NULL                     -- PLAN | ACQUIRE | EXTRACT | COMPARE | REASON | REPORT
+                           CHECK (step IN ('PLAN','ACQUIRE','EXTRACT','COMPARE','REASON','REPORT')),
+    message    TEXT        NOT NULL,                    -- human narration (not a debug log)
+    why        TEXT        NOT NULL,                    -- why this action was taken (required, never empty)
+    detail     JSONB       DEFAULT '{}'::jsonb          -- structured payload (hashes, counts, verdict, etc.)
 );
 
 -- Fast lookup: "give me all events for this run, in order"
-CREATE INDEX events_run_id_idx ON events(run_id, ts ASC);
+CREATE INDEX IF NOT EXISTS events_run_id_idx ON events (run_id, ts ASC);
+
+-- ── Migration note ─────────────────────────────────────────────────────────────
+-- If you ran the original schema (which had a different events definition with a
+-- runs FK and a detail_json column), recreate the table with:
+--
+--   DROP TABLE IF EXISTS events;
+--   (then re-run the CREATE TABLE above)
+

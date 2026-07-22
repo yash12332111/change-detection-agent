@@ -148,11 +148,11 @@ async def emit(
     print(f"           why: {why}")
 
     # ── Output 1: Persistent — Supabase events table ──────────────────────────
-    # This is a blocking call. In Phase 6 the pipeline runs in a BackgroundTask
-    # thread (not the event loop), so blocking here is safe — it no longer
-    # stalls SSE delivery.
+    # Supabase uses a synchronous client, which would block the event loop.
+    # We use asyncio.to_thread to offload the insert to a threadpool so SSE delivery is not stalled.
     try:
-        _storage.insert_event(
+        await asyncio.to_thread(
+            _storage.insert_event,
             run_id=run_id,
             step=step,
             message=message,

@@ -109,7 +109,7 @@ async def create_run(body: RunRequest, background_tasks: BackgroundTasks):
     run_id = str(uuid4())
 
     # Create the runs row so events FK constraint is satisfied.
-    _storage.create_run(run_id, body.url)
+    await asyncio.to_thread(_storage.create_run, run_id, body.url)
 
     # Subscribe BEFORE the task fires — queue must exist before any emit() calls.
     _events.subscribe(run_id)
@@ -152,7 +152,7 @@ async def stream_events(run_id: str):
             q = ev._queues.get(run_id)
 
         # ── Step 2: replay stored history ─────────────────────────────────────
-        stored = _storage.get_events(run_id)
+        stored = await asyncio.to_thread(_storage.get_events, run_id)
         # Deduplicate fingerprint: (step, first 80 chars of message).
         # ts cannot be used: Python datetime.now() runs before Supabase server-side now(),
         # so the second digit can differ between the queue event and the stored event.
@@ -242,10 +242,10 @@ async def get_run(run_id: str):
     - On SSE 'done' event to get the full report after streaming.
     - As a fallback if SSE closes without a REPORT event (terminal fallback).
     """
-    row = _storage.get_run(run_id)
-    if row is None:
+    run = await asyncio.to_thread(_storage.get_run, run_id)
+    if run is None:
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found.")
-    return row
+    return run
 
 
 @app.get("/snapshots", tags=["snapshots"])
@@ -254,5 +254,5 @@ async def list_snapshots(limit: int = 20):
     Return the most recent snapshots for the homepage history list.
     Excludes raw_html (too large for a list view).
     """
-    rows = _storage.list_snapshots(limit=min(limit, 100))
-    return {"snapshots": rows}
+    runs = await asyncio.to_thread(_storage.list_snapshots, limit=min(limit, 100))
+    return {"snapshots": runs}

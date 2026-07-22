@@ -87,7 +87,7 @@ async def run_pipeline(run_id: str, url: str) -> None:
             )
             report = {"verdict": "failed", "significance": "low",
                       "summary": f"Fetch failed: {exc}", "sections": []}
-            save_run_report(run_id, report, status="failed")
+            await asyncio.to_thread(save_run_report, run_id, report, status="failed")
             return
 
         canonical_url = result["canonical_url"]
@@ -123,7 +123,7 @@ async def run_pipeline(run_id: str, url: str) -> None:
             )
             report = {"verdict": "failed", "significance": "low",
                       "summary": f"Extraction failed: {exc}", "sections": []}
-            save_run_report(run_id, report, status="failed")
+            await asyncio.to_thread(save_run_report, run_id, report, status="failed")
             return
 
         await emit(
@@ -144,7 +144,7 @@ async def run_pipeline(run_id: str, url: str) -> None:
 
         # ── COMPARE ───────────────────────────────────────────────────────────
         try:
-            baseline_row = get_latest_snapshot(canonical_url)
+            baseline_row = await asyncio.to_thread(get_latest_snapshot, canonical_url)
             baseline = None
             if baseline_row and baseline_row.get("sections_json"):
                 baseline = {
@@ -241,7 +241,7 @@ async def run_pipeline(run_id: str, url: str) -> None:
             )
 
             try:
-                report = reason(page_context, diff_result)
+                report = await asyncio.to_thread(reason, page_context, diff_result)
             except (ReasoningError, Exception) as exc:
                 report = {"verdict": "unavailable", "significance": "low",
                           "summary": str(exc), "sections": []}
@@ -304,7 +304,8 @@ async def run_pipeline(run_id: str, url: str) -> None:
 
         # ── REPORT ────────────────────────────────────────────────────────────
         try:
-            snapshot_id = save_snapshot(
+            snapshot_id = await asyncio.to_thread(
+                save_snapshot,
                 canonical_url=canonical_url,
                 body=body,
                 meta={
@@ -324,13 +325,14 @@ async def run_pipeline(run_id: str, url: str) -> None:
                 why="Recording the failure so the run's incomplete state is visible in the audit trail.",
                 detail={"error": str(exc)},
             )
-            save_run_report(run_id, report, status="failed")
+            report["summary"] += f" [Snapshot error: {exc}]"
+            await asyncio.to_thread(save_run_report, run_id, report, status="failed")
             return
 
         # Persist the full report to runs.report_json — one column, one query.
         # GET /runs/{id} reads this directly. No event parsing, no snapshot joins.
         report["snapshot_id"] = snapshot_id
-        save_run_report(run_id, report, status="complete")
+        await asyncio.to_thread(save_run_report, run_id, report, status="complete")
 
         await emit(
             run_id, "REPORT",

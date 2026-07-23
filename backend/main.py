@@ -189,6 +189,16 @@ async def stream_events(run_id: str):
             yield "data: {\"done\": true}\n\n"
             return
 
+        # ── Step 2b: terminal-state check before blocking on the queue ─────────
+        # If the run failed early (e.g. ACQUIRE refusal) it writes status=failed
+        # to the DB and returns without ever emitting a REPORT event.  The queue
+        # drain below would block forever in that case.  Check the run row now
+        # so we can send `done` immediately if the run is already terminal.
+        run_row = await asyncio.to_thread(_storage.get_run, run_id)
+        if run_row and run_row.get("status") in ("complete", "failed"):
+            yield "data: {\"done\": true}\n\n"
+            return
+
         # ── Step 3: drain the live queue ──────────────────────────────────────
         if q is None:
             # No live queue — run may have completed and been unsubscribed already.
@@ -200,10 +210,20 @@ async def stream_events(run_id: str):
                 try:
                     # Non-blocking check first, then await with timeout so the
                     # HTTP connection keepalive comment fires regularly.
-                    evt = await asyncio.wait_for(q.get(), timeout=30.0)
+                    # 5 s (not 30 s) so the terminal-state check below fires
+                    # quickly after early-exit failures (ACQUIRE refusal, SSRF).
+                    evt = await asyncio.wait_for(q.get(), timeout=5.0)
                 except asyncio.TimeoutError:
                     # Send a keepalive comment so the connection doesn't drop.
                     yield ": keepalive\n\n"
+                    # Race-condition guard: if the pipeline aborted early (e.g.
+                    # ACQUIRE refusal), status=failed is written AFTER we did the
+                    # pre-drain terminal check.  Catch it here on each tick so
+                    # the stream doesn't wait a full 30 s extra cycle.
+                    run_row = await asyncio.to_thread(_storage.get_run, run_id)
+                    if run_row and run_row.get("status") in ("complete", "failed"):
+                        yield "data: {\"done\": true}\n\n"
+                        break
                     continue
 
                 # Deduplicate: (step, message prefix) — same key as replay above.

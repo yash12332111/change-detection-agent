@@ -116,8 +116,9 @@ export default function RunPage() {
   const [runUrl, setRunUrl]   = useState<string>("");
   const [openTrail, setOpenTrail] = useState(true);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
-  const esRef   = useRef<EventSource | null>(null);
-  const trailEl = useRef<HTMLDivElement | null>(null);
+  const esRef        = useRef<EventSource | null>(null);
+  const trailEl      = useRef<HTMLDivElement | null>(null);
+  const lastEventRef = useRef<number>(Date.now()); // timestamp of last SSE event
 
   // Auto-scroll trail as events arrive
   useEffect(() => {
@@ -147,6 +148,7 @@ export default function RunPage() {
   useEffect(() => {
     if (!runId) return;
     setStatus("running");
+    lastEventRef.current = Date.now();
 
     // Fetch the URL label in the background for display
     fetch(`${BACKEND}/runs/${runId}`)
@@ -168,27 +170,50 @@ export default function RunPage() {
           return;
         }
 
+        lastEventRef.current = Date.now(); // reset stall clock on each real event
         setEvents(prev => [...prev, data as PipelineEvent]);
       } catch {
         // Keepalive comment or malformed — ignore
       }
     };
 
-    // Terminal fallback: SSE closed without 'done' sentinel
+    // Terminal fallback: SSE error / unexpected close without 'done' sentinel
     es.onerror = () => {
       es.close();
-      // Only resolve if we haven't already completed
       setStatus(prev => {
         if (prev === "running") {
           fetchReport();
-          return "running"; // fetchReport will update status
+          return "running"; // fetchReport will flip the status
         }
         return prev;
       });
     };
 
+    // ── Stall detector ────────────────────────────────────────────────────────
+    // If the pipeline exits early (ACQUIRE refusal, SSRF block, etc.) the
+    // backend SSE sends a `done` sentinel and closes — but there is a race
+    // window where status=failed may not yet be written to the DB when the SSE
+    // hits its pre-drain terminal check.  In that case the SSE keeps the
+    // connection open for up to 30 s (the keepalive timeout).  We poll every
+    // 5 s; if we haven't received a real event in 15 s, we call fetchReport()
+    // directly — it reads report_json from the DB, which is authoritative.
+    const stallTimer = setInterval(() => {
+      setStatus(current => {
+        if (current !== "running") {
+          clearInterval(stallTimer);
+          return current;
+        }
+        const stalledMs = Date.now() - lastEventRef.current;
+        if (stalledMs >= 15_000) {
+          fetchReport();
+        }
+        return current;
+      });
+    }, 5_000);
+
     return () => {
       es.close();
+      clearInterval(stallTimer);
     };
   }, [runId, fetchReport]);
 
